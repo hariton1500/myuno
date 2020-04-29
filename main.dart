@@ -1,5 +1,6 @@
 
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -123,10 +124,18 @@ class Uno {
   }
 }
 
+class GameServer {
+
+}
+WebSocket socket;
+handleMsg(msg) {
+  print('Message received: $msg');
+  socket.add('message $msg recieved');
+}
 
 void main(List<String> args) {
-  print('Добро пожаловаь в игру UNO:classic');
-  Uno game = Uno();
+  print('Сервер игры UNO:classic');
+  /*Uno game = Uno();
   print('Размешиваем колоду');
   game.rand('base');
   //print('Карты: ${game.cards}');
@@ -136,5 +145,18 @@ void main(List<String> args) {
   game.setMoveTo(0);
   print('Делаем первый ход при раздаче');
   game.initMove();
-  //print('Карты: ${game.cards}');
+  //print('Карты: ${game.cards}');*/
+  runZoned(() async {
+    var server = await HttpServer.bind(InternetAddress.loopbackIPv4, 4040);
+    await for (var req in server) {
+      print(req.uri.pathSegments);
+      if (req.uri.path == '/') {
+        // Upgrade a HttpRequest to a WebSocket connection.
+        socket = await WebSocketTransformer.upgrade(req);
+        socket.listen(handleMsg);
+      };
+    }
+  },
+  onError: (e) => print("An error occurred."));
+
 }
