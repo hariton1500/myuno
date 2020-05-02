@@ -1,20 +1,23 @@
 
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
 class Uno {
-  List<String> humanPlayers = ['Player1', 'Player2', 'Player3'], compPlayers = [];
+  List<String> humanPlayers = [], compPlayers = [], gamesList = [];
   List<String> mastList = ['П', 'Т', 'Б', 'Ч'];
   List<String> dostList = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
   int currentMovePlayer = 1, basePlayer = 0;
   Map<String, List<String>> cards = {};
+  Map<String, String> playersInGames = {};
+  
   Uno() {
     cards['base'] = [];
     cards['heap'] = [];
-    humanPlayers.forEach((player) => cards[player] = []);
-    compPlayers.forEach((player) => cards[player] = []);
+    //humanPlayers.forEach((player) => cards[player] = []);
+    //compPlayers.forEach((player) => cards[player] = []);
     mastList.forEach((mast) {
       dostList.forEach((dost) {
         cards['base'].add(dost + '-' + mast);
@@ -60,7 +63,7 @@ class Uno {
     else {
       print('Ход: $_move');
       print('Переход хода игроку: ${setNextPlayer()}');
-    };
+    }
     return _move;
   }
 
@@ -94,7 +97,7 @@ class Uno {
       currentMovePlayer = 0;
     } else {
       currentMovePlayer++;
-    };
+    }
     return humanPlayers[currentMovePlayer];
   }
 
@@ -124,39 +127,63 @@ class Uno {
   }
 }
 
-class GameServer {
+class GameServer extends Uno {
 
+  void answerTo(List<String> to, Map<String, dynamic> msg) {
+    /*to.forEach((element) {
+      msg['msgTo'] = element;
+      socket.add(jsonEncode(msg));
+    });*/
+    msg['msgTo'] = to.first;
+    socket.add(jsonEncode(msg));
+  }
+  handleMsg(message) {
+    print('Message received: $message');
+    var msg = jsonDecode(message);
+    switch (msg['type']) {
+      case 'addPlayer':
+        if (!humanPlayers.contains(msg['name'])) {
+          humanPlayers.add(msg['name']);
+          print('Добавлен игрок по имени: ${msg['name']}');
+          answerTo([msg['from']], {'type' : 'answer', 'result' : 'ok', 'mess' : 'Регистрация пройдена'});
+          answerTo(humanPlayers, {'type' : 'playersListUpdate', 'playersList' : humanPlayers});
+          answerTo(humanPlayers, {'type' : 'gamesListUpdate', 'gamesList' : gamesList});
+        }
+        else {
+          answerTo([msg['from']], {'type' : 'answer', 'result' : 'notOk', 'mess' : 'Это имя уже занято'});
+        }
+        break;
+      case 'createGame':
+        gamesList.add(msg['name']);
+        answerTo(humanPlayers, {'type' : 'gamesListUpdate', 'gamesList' : gamesList});
+        break;
+      case 'deleteGame':
+        gamesList.remove(msg['name']);
+        answerTo(humanPlayers, {'type' : 'gamesListUpdate', 'gamesList' : gamesList});
+        break;
+      case 'enterGame':
+        playersInGames[msg['who']] = msg['gameName'];
+        answerTo(humanPlayers, {'type' : 'playersInGamesUpdate', 'playersInGames' : playersInGames});
+        break;
+      default:
+    }
+}
 }
 WebSocket socket;
-handleMsg(msg) {
-  print('Message received: $msg');
-  socket.add('message $msg recieved');
-}
 
 void main(List<String> args) {
   print('Сервер игры UNO:classic');
-  /*Uno game = Uno();
-  print('Размешиваем колоду');
-  game.rand('base');
-  //print('Карты: ${game.cards}');
-  print('Раздаем по 5 карт');
-  game.razdacha(5);
-  print('Карты: ${game.cards}');
-  game.setMoveTo(0);
-  print('Делаем первый ход при раздаче');
-  game.initMove();
-  //print('Карты: ${game.cards}');*/
+  GameServer unoServer = GameServer();
   runZoned(() async {
     var server = await HttpServer.bind(InternetAddress.loopbackIPv4, 4040);
     await for (var req in server) {
-      print(req.uri.pathSegments);
+      //print(req.uri.pathSegments);
       if (req.uri.path == '/') {
         // Upgrade a HttpRequest to a WebSocket connection.
         socket = await WebSocketTransformer.upgrade(req);
-        socket.listen(handleMsg);
-      };
+        socket.listen(unoServer.handleMsg);
+      }
     }
-  },
-  onError: (e) => print("An error occurred."));
+  }, onError: (e) => print(e));
 
 }
