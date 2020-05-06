@@ -145,9 +145,11 @@ class GameServer extends Uno {
   }
 
   handleServerSocket(Socket client) {
+    print('Socket client:');
+    print(client.remoteAddress.address + ':' + client.remotePort.toString());
     client.listen(hadleMsgInts);
     clients.add(client);
-    clientsSockets['$client.remoteAddress.address:${client.remotePort.toString()}'] = client;
+    //clientsSockets['$client.remoteAddress.address:${client.remotePort.toString()}'] = client;
   }
 
   hadleMsgInts(List<int> data) {
@@ -163,21 +165,22 @@ class GameServer extends Uno {
         if (!humanPlayers.contains(msg['name'])) {
           humanPlayers.add(msg['name']);
           print('Добавлен игрок по имени: ${msg['name']}');
-          answerTo([msg['from']], {'type' : 'answer', 'result' : 'ok', 'mess' : 'Регистрация пройдена'});
-          answerTo(clients, {'type' : 'playersListUpdate', 'playersList' : humanPlayers.join(';')});
-          answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : gamesList.join(';')});
+          clientsSockets[msg['name']] = clients.last;
+          answerTo([clients.last], {'type' : 'answer', 'result' : 'ok', 'mess' : 'Регистрация пройдена'});
+          answerTo(clients, {'type' : 'playersListUpdate', 'playersList' : jsonEncode(humanPlayers)});
+          answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         }
         else {
-          answerTo([msg['from']], {'type' : 'answer', 'result' : 'notOk', 'mess' : 'Это имя уже занято'});
+          answerTo([clients.last], {'type' : 'answer', 'result' : 'notOk', 'mess' : 'Это имя уже занято'});
         }
         break;
       case 'createGame':
         gamesList.add(msg['name']);
-        answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : gamesList.join(';')});
+        answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         break;
       case 'deleteGame':
         gamesList.remove(msg['name']);
-        answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : gamesList.join(';')});
+        answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         break;
       case 'enterGame':
         playersInGames[msg['who']] = msg['gameName'];
@@ -202,7 +205,9 @@ void main(List<String> args) {
         socket.listen(unoServer.handleMsg);
       }
     }*/
-    ServerSocket.bind(InternetAddress.anyIPv4, 4040).then((ServerSocket server) {server.listen(unoServer.handleServerSocket);});
+    ServerSocket.bind(InternetAddress.anyIPv4, 4040).then((ServerSocket server) {
+      server.listen(unoServer.handleServerSocket);
+    });
   }, onError: (e) => print(e));
 
 }
