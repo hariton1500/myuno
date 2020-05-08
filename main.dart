@@ -140,7 +140,9 @@ class GameServer extends Uno {
   }*/
   answerTo(List<Socket> to, Map<String, String> msg) {
     to.forEach((client) {
-      client.write(msg);
+      client.add(utf8.encode(json.encode(msg)));
+      //client.writeln();
+      //Future.delayed(Duration(milliseconds: 100));
     });
   }
 
@@ -165,9 +167,12 @@ class GameServer extends Uno {
         if (!humanPlayers.contains(msg['name'])) {
           humanPlayers.add(msg['name']);
           print('Добавлен игрок по имени: ${msg['name']}');
+          print('clients:${clients.last.remoteAddress.address}');
           clientsSockets[msg['name']] = clients.last;
           answerTo([clients.last], {'type' : 'answer', 'result' : 'ok', 'mess' : 'Регистрация пройдена'});
+          sleep(Duration(milliseconds: 100));
           answerTo(clients, {'type' : 'playersListUpdate', 'playersList' : jsonEncode(humanPlayers)});
+          sleep(Duration(milliseconds: 100));
           answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         }
         else {
@@ -184,7 +189,7 @@ class GameServer extends Uno {
         break;
       case 'enterGame':
         playersInGames[msg['who']] = msg['gameName'];
-        answerTo(clients, {'type' : 'playersInGamesUpdate', 'newPlayerInGame' : '${msg['who']};${msg['gameName']}'});
+        answerTo(clients, {'type' : 'playersInGamesUpdate', 'newPlayerInGame' : jsonEncode(playersInGames)});
         break;
       default:
     }
