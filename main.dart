@@ -1,135 +1,19 @@
-
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'uno.dart';
 
-class Uno {
-  List<String> humanPlayers = [], compPlayers = [], gamesList = [];
-  List<String> mastList = ['П', 'Т', 'Б', 'Ч'];
-  List<String> dostList = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
-  int currentMovePlayer = 1, basePlayer = 0;
-  Map<String, List<String>> cards = {};
-  Map<String, String> playersInGames = {};
-  
-  Uno() {
-    cards['base'] = [];
-    cards['heap'] = [];
-    //humanPlayers.forEach((player) => cards[player] = []);
-    //compPlayers.forEach((player) => cards[player] = []);
-    mastList.forEach((mast) {
-      dostList.forEach((dost) {
-        cards['base'].add(dost + '-' + mast);
-      });
-    });
-    print('Карты: $cards');
-  }
 
-  void rand(String owner) {
-    List<String> tempBase = [];
-    for (var i = 0; i < cards[owner].length; i++) {
-      tempBase.add(cards[owner].elementAt(Random().nextInt(cards[owner].length)));
-    }
-    cards[owner].clear();
-    cards[owner] = tempBase;
-  }
-
-  void razdacha(int num) {
-    for (var i = 0; i < num; i++) {
-      humanPlayers.forEach((player) {
-        cards[player].add(cards['base'].first);
-        cards['base'].removeAt(0);
-      });
-    }
-  }
-
-  List<String> initMove() {
-    List<String> _move = [];
-    cards['heap'].add(cards['base'].first);
-    print(cards['heap']);
-    _move.add(cards['base'].first);
-    cards['base'].removeAt(0);
-    String _dost = cards['heap'].first.split('-')[0];
-    bool _sameDostCards = false;
-    cards[humanPlayers[currentMovePlayer]].forEach((card){
-      if (card.startsWith(_dost)) _sameDostCards = true;
-      }
-    );
-    if (_sameDostCards) {
-      _move.addAll(letPlayerEndMoveWithSameDostCards(_dost));
-      print('Ход: $_move');
-    }
-    else {
-      print('Ход: $_move');
-      print('Переход хода игроку: ${setNextPlayer()}');
-    }
-    return _move;
-  }
-
-  List<String> letPlayerEndMoveWithSameDostCards(String dost) {
-    List<String> _move = [];
-    List<int> variants = [];
-    print('Можно добавить карты к текущему ходу (укажите цифры через запятую):');
-    int _index = 0;
-    cards[humanPlayers[currentMovePlayer]].forEach((card) {
-      if (card.startsWith(dost)) {
-        print('Выбор: [$_index] $card');
-        variants.add(_index);
-      }
-      _index++;
-    });
-    String input = stdin.readLineSync();
-    //print(input);
-    input.split(',').forEach((str){_move.add(cards[currentMovePlayer][int.parse(str)]);});
-
-    return _move;
-
-  }
-
-  void setMoveTo(int index) {
-    currentMovePlayer = index;
-  }
-
-  String setNextPlayer() {
-    int numberOfPlayers = humanPlayers.length + compPlayers.length;
-    if (currentMovePlayer == numberOfPlayers) {
-      currentMovePlayer = 0;
-    } else {
-      currentMovePlayer++;
-    }
-    return humanPlayers[currentMovePlayer];
-  }
-
-  void razdachaToCurrentPlayer(int num) {
-    for (var i = 0; i < num; i++) {
-      cards[currentMovePlayer].add(cards['base'].first);
-      cards['base'].removeAt(0);
-    }
-  }
-  void makeRuleOperation(List<String> moveCards) {
-    List<String> _card;
-    _card = cards['heap'].last.split('-');
-    String _dost = _card[0];
-    switch (_dost) {
-      case '6': {
-        razdachaToCurrentPlayer(2);
-      }
-      break;
-      case '7': {
-        razdachaToCurrentPlayer(1);
-      }
-      break;
-      case '8': {
-        setNextPlayer();
-      }
-    }
-  }
-}
-
-class GameServer extends Uno {
+class GameServer {
   List<Socket> clients = [];
   Map<String, Socket> clientsSockets = {};
+  Map<String, int> scoreMap = {};
+  Map<String, String> playersInGames = {};
+  List<String> players = [], gamesList = [];
+
+  //список игр
+  List<Uno> games;
   /*void answerTo(List<String> to, Map<String, dynamic> msg) {
     to.forEach((element) {
       msg['msgTo'] = element;
@@ -164,14 +48,15 @@ class GameServer extends Uno {
     var msg = jsonDecode(message);
     switch (msg['type']) {
       case 'addPlayer':
-        if (!humanPlayers.contains(msg['name'])) {
-          humanPlayers.add(msg['name']);
+        if (!players.contains(msg['name'])) {
+          players.add(msg['name']);
           print('Добавлен игрок по имени: ${msg['name']}');
-          print('clients:${clients.last.remoteAddress.address}');
-          clientsSockets[msg['name']] = clients.last;
+          print('client IP:${clients.last.remoteAddress.address}');
+          clientsSockets[msg['name']] = clients.last; //закрепляем сокет за игроком, чтобы знать кому отправлять сообщение
+          scoreMap[msg['name']] = 0; //инициализация счетчика очков
           answerTo([clients.last], {'type' : 'answer', 'result' : 'ok', 'mess' : 'Регистрация пройдена'});
           sleep(Duration(milliseconds: 100));
-          answerTo(clients, {'type' : 'playersListUpdate', 'playersList' : jsonEncode(humanPlayers)});
+          answerTo(clients, {'type' : 'playersListUpdate', 'playersList' : jsonEncode(players)});
           sleep(Duration(milliseconds: 100));
           answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         }
@@ -191,8 +76,36 @@ class GameServer extends Uno {
         playersInGames[msg['who']] = msg['gameName'];
         answerTo(clients, {'type' : 'playersInGamesUpdate', 'newPlayerInGame' : jsonEncode(playersInGames)});
         break;
+      case 'runGame':
+        startGame(msg['gameName']);
+        break;
       default:
     }
+  }
+
+  startGame(String gameName) {
+    //ЗАПУСКАЕМ ИГРУ
+    //формируем списки игроков и сокетов участников игры
+    List<String> playersOfGame = []; //список игроков этой игры
+    List<Socket> socketsTo = []; //список сокетов игроков этой игры
+    playersInGames.forEach((String name, String game){
+      if (game == gameName) playersOfGame.add(name);
+    });
+    clientsSockets.forEach((String name, Socket socket){
+      if (playersOfGame.contains(name)) socketsTo.add(socket);
+    });
+    //создаем игру
+    Uno game = Uno(gameName, playersOfGame);
+    games.add(game);
+    //отправляем игрокам сообщение о старте игры
+    answerTo(socketsTo, {'type' : 'startGame', 'gameName' : gameName, 'gameRunner' : gameName});
+    //отправляем игрокам их карты
+    game.humanPlayers.forEach((String player){
+      answerTo([clientsSockets[player]], {'type' : 'yourCards', 'cards' : json.encode(game.cards[player])});
+    });
+    //определяем чей ход
+    game.currentMovePlayer = Random().nextInt(playersOfGame.length);
+
   }
 }
 //WebSocket socket;
