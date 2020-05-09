@@ -79,6 +79,30 @@ class GameServer {
       case 'runGame':
         startGame(msg['gameName']);
         break;
+      case 'inGame':
+        onInGameAnswer(msg);
+        break;
+      default:
+    }
+  }
+
+  onInGameAnswer(dynamic message) {
+    int _index = games.indexWhere((game){return game.name == message['gameName'];});
+    switch (message['gameType']) {
+      case 'playerMove':
+        String answer = games[_index].makeRuleOperation(message['move']);
+        var toDo = json.decode(answer);
+        if (toDo['updateCards']) {
+          String _whoGotNewCards = games[_index].nextPlayer();
+          answerTo([clientsSockets[_whoGotNewCards]], {'type' : 'updateCards', 'cards' : json.encode(games[_index].cards[_whoGotNewCards])});
+        }
+        if (toDo['setMast']) {
+          answerTo([clientsSockets[games[_index].currentMovePlayer]], {'type' : 'setMast'});
+        }
+        break;
+      case 'setMast':
+        games[_index].orderedMast = message['orderedMast'];
+      break;
       default:
     }
   }
@@ -103,9 +127,17 @@ class GameServer {
     game.humanPlayers.forEach((String player){
       answerTo([clientsSockets[player]], {'type' : 'yourCards', 'cards' : json.encode(game.cards[player])});
     });
-    //определяем чей ход
+    //определяем чей ход следующий
     game.currentMovePlayer = Random().nextInt(playersOfGame.length);
-
+    //достаем первую карту из колоды
+    game.initMove();
+    //сообщаем всем про первую карту в куче
+    answerTo(socketsTo, {'type' : 'initMove', 'heap' : json.encode(game.cards['heap'])});
+    sleep(Duration(milliseconds: 100));
+    //если у текущего игрока есть карты того же достоинства то даем ему ими походить по желанию
+    if (game.playerCanAddCardsToMove()) {
+      answerTo([socketsTo[game.currentMovePlayer]], {'type' : 'youCanAddCards', 'dost' : game.dostOf(game.cards['heap'].first)});
+    }
   }
 }
 //WebSocket socket;

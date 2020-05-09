@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'dart:math';
@@ -8,7 +9,7 @@ class Uno {
   List<String> dostList = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
   int currentMovePlayer, basePlayer = 0;
   Map<String, List<String>> cards = {};
-  String name;
+  String name, orderedMast = '';
   
   Uno(this.name, this.humanPlayers) {
     //this.gameName = name;
@@ -27,7 +28,7 @@ class Uno {
     print('[$name] Размешиваем колоду...');
     rand('base');
     print('[$name] Раздаем карты');
-    razdacha(humanPlayers.length);
+    razdacha(5);
   }
 
   void rand(String owner) {
@@ -48,28 +49,31 @@ class Uno {
     }
   }
 
-  List<String> initMove() {
+  initMove() {
     List<String> _move = [];
     cards['heap'].add(cards['base'].first);
     print(cards['heap']);
     _move.add(cards['base'].first);
     cards['base'].removeAt(0);
-    String _dost = cards['heap'].first.split('-')[0];
+  }
+
+  bool playerCanAddCardsToMove() {
     bool _sameDostCards = false;
     cards[humanPlayers[currentMovePlayer]].forEach((card){
-      if (card.startsWith(_dost)) _sameDostCards = true;
+      if (dostOf(card) == dostOf(cards['heap'].first)) _sameDostCards = true;
       }
     );
-    if (_sameDostCards) {
-      _move.addAll(letPlayerEndMoveWithSameDostCards(_dost));
-      print('Ход: $_move');
-    }
-    else {
-      print('Ход: $_move');
-      print('Переход хода игроку: ${setNextPlayer()}');
-    }
-    return _move;
+    return _sameDostCards;
   }
+
+  String dostOf(String card) {
+    return card.split('-')[0];
+  }
+
+  String mastOf(String card) {
+    return card.split('-')[1];
+  }
+
 
   List<String> letPlayerEndMoveWithSameDostCards(String dost) {
     List<String> _move = [];
@@ -86,47 +90,69 @@ class Uno {
     String input = stdin.readLineSync();
     //print(input);
     input.split(',').forEach((str){_move.add(cards[currentMovePlayer][int.parse(str)]);});
-
     return _move;
-
   }
 
   void setMoveTo(int index) {
     currentMovePlayer = index;
   }
 
-  String setNextPlayer() {
-    int numberOfPlayers = humanPlayers.length + compPlayers.length;
-    if (currentMovePlayer == numberOfPlayers) {
-      currentMovePlayer = 0;
-    } else {
-      currentMovePlayer++;
+  setNextPlayer(int times) {
+    for (var i = 0; i < times; i++) {
+      int numberOfPlayers = humanPlayers.length;
+      if (currentMovePlayer == numberOfPlayers) {
+        currentMovePlayer = 0;
+      } else {
+        currentMovePlayer++;
+      }
     }
-    return humanPlayers[currentMovePlayer];
   }
 
-  void razdachaToCurrentPlayer(int num) {
+  void razdachaToNextPlayer(int num) {
     for (var i = 0; i < num; i++) {
-      cards[currentMovePlayer].add(cards['base'].first);
+      cards[nextPlayer()].add(cards['base'].first);
       cards['base'].removeAt(0);
     }
   }
-  void makeRuleOperation(List<String> moveCards) {
-    List<String> _card;
-    _card = cards['heap'].last.split('-');
-    String _dost = _card[0];
-    switch (_dost) {
+
+  String nextPlayer() {
+    int numberOfPlayers = humanPlayers.length;
+    if (currentMovePlayer == numberOfPlayers) {
+      return humanPlayers[0];
+    } else {
+      return humanPlayers[currentMovePlayer + 1];
+    }
+  }
+
+  String makeRuleOperation(List<String> moveCards) {
+    Map<String, dynamic> answer = {'updateCards' : false, 'setMast' : false};
+    switch (dostOf(moveCards.first)) {
       case '6': {
-        razdachaToCurrentPlayer(2);
+        razdachaToNextPlayer(2 * moveCards.length);
+        answer['updateCards'] = true;
+        setNextPlayer(2);
       }
       break;
       case '7': {
-        razdachaToCurrentPlayer(1);
+        razdachaToNextPlayer(1 * moveCards.length);
+        answer['updateCards'] = true;
+        setNextPlayer(2);
       }
       break;
       case '8': {
-        setNextPlayer();
+        razdachaToNextPlayer(1 * moveCards.length);
+        answer['updateCards'] = true;
+        setNextPlayer(1);
       }
+      break;
+      case 'T':
+        setNextPlayer(2 + moveCards.length);
+      break;
+      case 'J': {
+        answer['setMast'] = true;
+      }
+      break;
     }
+    return json.encode(answer);
   }
 }
