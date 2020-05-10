@@ -25,21 +25,31 @@ class GameServer {
   answerTo(List<Socket> to, Map<String, String> msg) {
     to.forEach((client) {
       client.add(utf8.encode(json.encode(msg)));
+      //client.writeln(json.encode(msg));
       //client.writeln();
       //Future.delayed(Duration(milliseconds: 100));
     });
   }
 
-  handleServerSocket(Socket client) {
+  handleSocketsStream(Socket client) {
     print('Socket client:');
     print(client.remoteAddress.address + ':' + client.remotePort.toString());
-    client.listen(hadleMsgInts);
+    client.listen(hadleMsgInts, onDone: onClientSocketDone, onError: onClientSocketError, cancelOnError: true);
     clients.add(client);
     //clientsSockets['$client.remoteAddress.address:${client.remotePort.toString()}'] = client;
   }
 
+  onClientSocketDone() {
+    print('Client Socket is done');
+  }
+
+  onClientSocketError(e) {
+    print('Client Socket is Error $e');
+  }
+
   hadleMsgInts(List<int> data) {
-    String msg = String.fromCharCodes(data).trim();
+    print('msgInts: $data');
+    String msg = utf8.decode(data);
     handleMsg(msg);
   }
 
@@ -55,9 +65,9 @@ class GameServer {
           clientsSockets[msg['name']] = clients.last; //закрепляем сокет за игроком, чтобы знать кому отправлять сообщение
           scoreMap[msg['name']] = 0; //инициализация счетчика очков
           answerTo([clients.last], {'type' : 'answer', 'result' : 'ok', 'mess' : 'Регистрация пройдена'});
-          sleep(Duration(milliseconds: 100));
+          sleep(Duration(milliseconds: 500));
           answerTo(clients, {'type' : 'playersListUpdate', 'playersList' : jsonEncode(players)});
-          sleep(Duration(milliseconds: 100));
+          sleep(Duration(milliseconds: 500));
           answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         }
         else {
@@ -73,6 +83,7 @@ class GameServer {
         answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         break;
       case 'enterGame':
+        //print(msg);
         playersInGames[msg['who']] = msg['gameName'];
         answerTo(clients, {'type' : 'playersInGamesUpdate', 'newPlayerInGame' : jsonEncode(playersInGames)});
         break;
@@ -155,9 +166,15 @@ void main(List<String> args) {
         socket.listen(unoServer.handleMsg);
       }
     }*/
-    ServerSocket.bind(InternetAddress.anyIPv4, 4040).then((ServerSocket server) {
-      server.listen(unoServer.handleServerSocket);
-    });
-  }, onError: (e) => print(e));
-
+    ServerSocket.bind(InternetAddress.anyIPv4, 4040, shared: true).then((ServerSocket server) {
+      server.listen(unoServer.handleSocketsStream);
+      server.handleError((e){print;});
+    }).catchError((Object error){});
+  }, onError: (e, StackTrace stack){
+    print('ServerSocket error: $e');
+    //print(e.runtimeType);
+    //print(e.name);
+    //print(e.message);
+    //print(stack.toString());
+  });
 }
