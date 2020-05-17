@@ -9,11 +9,13 @@ class GameServer {
   List<Socket> clients = [];
   Map<String, Socket> clientsSockets = {};
   Map<String, int> scoreMap = {};
-  Map<String, String> playersInGames = {};
+  Map<String, String> playersInGames = {}, GamesWithPlayers = {};
   List<String> players = [], gamesList = [];
+  Map<Socket, String> socketsClients = {};
+
 
   //список игр
-  List<Uno> games;
+  List<Uno> games = [];
   /*void answerTo(List<String> to, Map<String, dynamic> msg) {
     to.forEach((element) {
       msg['msgTo'] = element;
@@ -24,23 +26,28 @@ class GameServer {
   }*/
   answerTo(List<Socket> to, Map<String, String> msg) {
     to.forEach((client) {
+      print('Sending to ${socketsClients[client]}: ${client.remoteAddress.address}');
+      print(msg);
       client.add(utf8.encode(json.encode(msg)));
-      //client.writeln(json.encode(msg));
-      //client.writeln();
-      //Future.delayed(Duration(milliseconds: 100));
     });
   }
 
   handleSocketsStream(Socket client) {
     print('Socket client:');
     print(client.remoteAddress.address + ':' + client.remotePort.toString());
-    client.listen(hadleMsgInts, onDone: onClientSocketDone, onError: onClientSocketError, cancelOnError: true);
+    StreamSubscription<List<int>> subscript = client.listen(hadleMsgInts, onDone: onClientSocketDone(client), onError: onClientSocketError, cancelOnError: true);
     clients.add(client);
-    //clientsSockets['$client.remoteAddress.address:${client.remotePort.toString()}'] = client;
   }
 
-  onClientSocketDone() {
+  onClientSocketDone(Socket socket) {
     print('Client Socket is done');
+    print('${socket.remoteAddress.address} closing');
+    String _player = socketsClients[socket];
+    if (_player != null) {
+      print('Remove player: $_player');
+      players.remove(_player);
+      clients.remove(socket);
+    }
   }
 
   onClientSocketError(e) {
@@ -48,7 +55,7 @@ class GameServer {
   }
 
   hadleMsgInts(List<int> data) {
-    print('msgInts: $data');
+    //print('msgInts: $data');
     String msg = utf8.decode(data);
     handleMsg(msg);
   }
@@ -63,28 +70,32 @@ class GameServer {
           print('Добавлен игрок по имени: ${msg['name']}');
           print('client IP:${clients.last.remoteAddress.address}');
           clientsSockets[msg['name']] = clients.last; //закрепляем сокет за игроком, чтобы знать кому отправлять сообщение
+          socketsClients[clients.last] = msg['name'];
           scoreMap[msg['name']] = 0; //инициализация счетчика очков
           answerTo([clients.last], {'type' : 'answer', 'result' : 'ok', 'mess' : 'Регистрация пройдена'});
-          sleep(Duration(milliseconds: 500));
-          answerTo(clients, {'type' : 'playersListUpdate', 'playersList' : jsonEncode(players)});
-          sleep(Duration(milliseconds: 500));
-          answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         }
         else {
           answerTo([clients.last], {'type' : 'answer', 'result' : 'notOk', 'mess' : 'Это имя уже занято'});
         }
         break;
+      case 'getGamesList':
+        answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
+        break;
       case 'createGame':
         gamesList.add(msg['name']);
+        playersInGames[msg['name']] = msg['name'];
         answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         break;
       case 'deleteGame':
         gamesList.remove(msg['name']);
-        answerTo(clients, {'type' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
+        answerTo(clients, {'type' : 'gameDestroyed', 'name' : msg['name'], 'type2' : 'gamesListUpdate', 'gamesList' : jsonEncode(gamesList)});
         break;
       case 'enterGame':
-        //print(msg);
         playersInGames[msg['who']] = msg['gameName'];
+        answerTo(clients, {'type' : 'playersInGamesUpdate', 'newPlayerInGame' : jsonEncode(playersInGames)});
+        break;
+      case 'leaveGame':
+        playersInGames.remove(msg['who']);
         answerTo(clients, {'type' : 'playersInGamesUpdate', 'newPlayerInGame' : jsonEncode(playersInGames)});
         break;
       case 'runGame':
@@ -92,6 +103,9 @@ class GameServer {
         break;
       case 'inGame':
         onInGameAnswer(msg);
+        break;
+      case 'dataReady':
+        answerTo([clientsSockets[msg['from']]], {'type' : 'dataReadyOk'});
         break;
       default:
     }
@@ -114,6 +128,16 @@ class GameServer {
       case 'setMast':
         games[_index].orderedMast = message['orderedMast'];
       break;
+      case 'getMyCards':
+      //отправляем игрокам их карты
+        int _index = games.indexWhere((game){return game.name == message['gameName'];});
+        answerTo([clientsSockets[message['name']]], {'type' : 'yourCards', 'cards' : json.encode(games[_index].cards[message['name']])});
+      break;
+      case 'getInitMove':
+        //сообщаем про первую карту в куче
+        int _index = games.indexWhere((game){return game.name == message['gameName'];});
+        answerTo([clientsSockets[message['name']]], {'type' : 'initMove', 'heap' : games[_index].cards['heap'].first});
+      break;
       default:
     }
   }
@@ -132,49 +156,33 @@ class GameServer {
     //создаем игру
     Uno game = Uno(gameName, playersOfGame);
     games.add(game);
-    //отправляем игрокам сообщение о старте игры
-    answerTo(socketsTo, {'type' : 'startGame', 'gameName' : gameName, 'gameRunner' : gameName});
-    //отправляем игрокам их карты
-    game.humanPlayers.forEach((String player){
-      answerTo([clientsSockets[player]], {'type' : 'yourCards', 'cards' : json.encode(game.cards[player])});
-    });
     //определяем чей ход следующий
-    game.currentMovePlayer = Random().nextInt(playersOfGame.length);
+    games.last.currentMovePlayer = Random().nextInt(playersOfGame.length);
     //достаем первую карту из колоды
-    game.initMove();
-    //сообщаем всем про первую карту в куче
-    answerTo(socketsTo, {'type' : 'initMove', 'heap' : json.encode(game.cards['heap'])});
-    sleep(Duration(milliseconds: 100));
+    games.last.initMove();
+    //отправляем игрокам сообщение о старте игры
+    Map<String, String> _msg = {};
+    _msg = {'type' : 'runGame', 'gameName' : gameName, 'gameRunner' : gameName, 'movePlayer' : playersOfGame[games.last.currentMovePlayer]};
+    //sleep(Duration(milliseconds: 100));
     //если у текущего игрока есть карты того же достоинства то даем ему ими походить по желанию
-    if (game.playerCanAddCardsToMove()) {
-      answerTo([socketsTo[game.currentMovePlayer]], {'type' : 'youCanAddCards', 'dost' : game.dostOf(game.cards['heap'].first)});
+    if (games.last.playerCanAddCardsToMove()) {
+      //answerTo([socketsTo[games.last.currentMovePlayer]], {});
+      _msg.addAll({'typeMove' : 'youCanAddCards', 'dost' : games.last.dostOf(games.last.cards['heap'].first)});
     }
+    answerTo(socketsTo, _msg);
+
   }
 }
-//WebSocket socket;
 
 void main(List<String> args) {
   print('Сервер игры UNO:classic');
   GameServer unoServer = GameServer();
   runZoned(() async {
-    /*var server = await HttpServer.bind(InternetAddress.anyIPv4, 4040);
-    await for (var req in server) {
-      //print(req.uri.pathSegments);
-      if (req.uri.path == '/') {
-        // Upgrade a HttpRequest to a WebSocket connection.
-        socket = await WebSocketTransformer.upgrade(req);
-        socket.listen(unoServer.handleMsg);
-      }
-    }*/
-    ServerSocket.bind(InternetAddress.anyIPv4, 4040, shared: true).then((ServerSocket server) {
+    ServerSocket.bind(InternetAddress.anyIPv4, 4040).then((ServerSocket server) {
       server.listen(unoServer.handleSocketsStream);
       server.handleError((e){print;});
     }).catchError((Object error){});
   }, onError: (e, StackTrace stack){
     print('ServerSocket error: $e');
-    //print(e.runtimeType);
-    //print(e.name);
-    //print(e.message);
-    //print(stack.toString());
   });
 }

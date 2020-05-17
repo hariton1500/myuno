@@ -4,21 +4,18 @@ import 'dart:io';
 import 'dart:math';
 
 class Uno {
-  List<String> humanPlayers = [], compPlayers = [];
+  final List<String> humanPlayers, compPlayers = [];
   List<String> mastList = ['П', 'Т', 'Б', 'Ч'];
   List<String> dostList = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
   int currentMovePlayer, basePlayer = 0;
   Map<String, List<String>> cards = {};
-  String name, orderedMast = '';
+  final String name;
+  String orderedMast = '';
   
   Uno(this.name, this.humanPlayers) {
-    //this.gameName = name;
-    //this.humanPlayers = players;
-
     cards['base'] = [];
     cards['heap'] = [];
-    //humanPlayers.forEach((player) => cards[player] = []);
-    //compPlayers.forEach((player) => cards[player] = []);
+    humanPlayers.forEach((player) => cards[player] = []);
     mastList.forEach((mast) {
       dostList.forEach((dost) {
         cards['base'].add(dost + '-' + mast);
