@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'dart:math';
 
 class Uno {
@@ -31,7 +28,9 @@ class Uno {
   void rand(String owner) {
     List<String> tempBase = [];
     for (var i = 0; i < cards[owner].length; i++) {
-      tempBase.add(cards[owner].elementAt(Random().nextInt(cards[owner].length)));
+      int _index = Random().nextInt(cards[owner].length);
+      tempBase.add(cards[owner].elementAt(_index));
+      cards[owner].removeAt(_index);
     }
     cards[owner].clear();
     cards[owner] = tempBase;
@@ -71,25 +70,6 @@ class Uno {
     return card.split('-')[1];
   }
 
-
-  List<String> letPlayerEndMoveWithSameDostCards(String dost) {
-    List<String> _move = [];
-    List<int> variants = [];
-    print('Можно добавить карты к текущему ходу (укажите цифры через запятую):');
-    int _index = 0;
-    cards[humanPlayers[currentMovePlayer]].forEach((card) {
-      if (card.startsWith(dost)) {
-        print('Выбор: [$_index] $card');
-        variants.add(_index);
-      }
-      _index++;
-    });
-    String input = stdin.readLineSync();
-    //print(input);
-    input.split(',').forEach((str){_move.add(cards[currentMovePlayer][int.parse(str)]);});
-    return _move;
-  }
-
   void setMoveTo(int index) {
     currentMovePlayer = index;
   }
@@ -121,35 +101,40 @@ class Uno {
     }
   }
 
-  String makeRuleOperation(List<String> moveCards) {
-    Map<String, dynamic> answer = {'updateCards' : false, 'setMast' : false};
+  Map<String, dynamic> makeRuleOperation(List<String> moveCards) {
+    Map<String, dynamic> answer = {'updateCards' : false, 'countCards' : 0};//, 'setMast' : false};
     switch (dostOf(moveCards.first)) {
       case '6': {
         razdachaToNextPlayer(2 * moveCards.length);
         answer['updateCards'] = true;
+        answer['countCards'] = 2;
         setNextPlayer(2);
       }
       break;
       case '7': {
         razdachaToNextPlayer(1 * moveCards.length);
         answer['updateCards'] = true;
+        answer['countCards'] = 1;
         setNextPlayer(2);
       }
       break;
       case '8': {
         razdachaToNextPlayer(1 * moveCards.length);
         answer['updateCards'] = true;
+        answer['countCards'] = 1;
         setNextPlayer(1);
       }
       break;
       case 'T':
-        setNextPlayer(2 + moveCards.length);
+        setNextPlayer(1 + moveCards.length);
       break;
+      /*
       case 'J': {
         answer['setMast'] = true;
       }
       break;
+      */
     }
-    return json.encode(answer);
+    return answer;
   }
 }
