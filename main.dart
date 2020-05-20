@@ -51,7 +51,7 @@ class GameServer {
       out(clients, 'Sockets List');
       socketsClients.remove(socket);
       out(socketsClients, 'Sockets Clients Map');
-    }
+    } else print('unknown connection closed');
   }
 
   onClientSocketError(e) {
@@ -60,7 +60,7 @@ class GameServer {
 
   hadleMsgInts(List<int> data) {
     //print('msgInts: $data');
-    String msg = utf8.decode(data);
+    String msg = utf8.decode(data, allowMalformed: true);
     handleMsg(msg);
   }
 
@@ -136,7 +136,10 @@ class GameServer {
     int _index = games.indexWhere((game){return game.name == message['gameName'];});
     switch (message['gameType']) {
       case 'playerMove':
-        var toDo = games[_index].makeRuleOperation(message['move']);
+        List _move = message['move'];
+        List<String> __move = [];
+        _move.forEach((_card) {__move.add(_card.toString());});
+        var toDo = games[_index].makeRuleOperation(__move);
         //var toDo = json.decode(answer);
         if (toDo['updateCards']) {
           String _whoGotNewCards = games[_index].nextPlayer();
@@ -145,26 +148,37 @@ class GameServer {
         if (toDo['setMast']) {
           answerTo([clientsSockets[games[_index].currentMovePlayer]], {'type' : 'setMast'});
         }
+
         break;
       case 'setMast':
         games[_index].orderedMast = message['orderedMast'];
       break;
       case 'getMyCardsAndInitMove':
-        //int _index = games.indexWhere((game){return game.name == message['gameName'];});
+        Map<String, String> _msg = {'type' : 'inGame'};
         Map<String, int> _coPlayers = {};
         games[_index].cards.forEach((name, cardsOfName){
           if (name != 'base' && name != 'heap' && message['name'].toString() != name) {
             _coPlayers[name] = games[_index].cards[name].length;
           }
         });
-        answerTo([clientsSockets[message['name']]], {
-          'type' : 'yourCardsAndInitMove',
+        _msg.addAll({
+          'typeMove' : 'yourCardsAndInitMove',
           'cards' : json.encode(games[_index].cards[message['name']]),
           'heap' : games[_index].cards['heap'].first,
           'base' : json.encode(games[_index].cards['base'].length),
           'coPlayers' : json.encode(_coPlayers)
         });
+        //if (games[_index].playerCanAddCardsToMove()) _msg.addAll({'typeMove' : 'youCanAddCards', 'dost' : games.last.dostOf(games.last.cards['heap'].first)});
+        answerTo([clientsSockets[message['name']]], _msg);
       break;
+      case 'whatNextFirst?':
+        Uno _game = games[_index];
+        if (message['name'] == _game.humanPlayers[_game.currentMovePlayer]) {
+          if (_game.playerCanAddCardsToMove()) {
+            answerTo([clientsSockets[message['name']]], {'type' : 'inGame', 'typeMove' : 'youCanAddCards', 'dost' : games.last.dostOf(games.last.cards['heap'].first)});
+          } else onInGameAnswer({'type' : 'inGame', 'gameType' : 'playerMove', 'move' : json.encode([_game.cards['heap'].last]), 'gameName' : message['gameName']});
+        } else answerTo([clientsSockets[message['name']]], {'type' : 'inGame', 'typeMove' : 'moverIs', 'movePlayer' : _game.humanPlayers[_game.currentMovePlayer]});
+        break;
       case 'getMyCards':
       //отправляем игроку его карты
         //int _index = games.indexWhere((game){return game.name == message['gameName'];});
@@ -179,7 +193,8 @@ class GameServer {
         //int _index = games.indexWhere((game){return game.name == message['gameName'];});
         List<String> _move = [games[_index].cards['heap'].first];
         _move.addAll(message['moveCards']);
-        grepOfMove(games[_index].makeRuleOperation(_move), _index);
+        var toDo = games[_index].makeRuleOperation(_move);
+        print(toDo);
       break;
       default:
     }
@@ -210,17 +225,26 @@ class GameServer {
     //достаем первую карту из колоды
     games.last.initMove();
     //отправляем игрокам сообщение о старте игры
-    Map<String, String> _msg = {};
-    _msg = {'type' : 'runGame', 'gameName' : gameName, 'gameRunner' : gameName, 'movePlayer' : playersOfGame[games.last.currentMovePlayer]};
+    //Map<String, String> _msg = {};
+    answerTo(socketsTo, {'type' : 'runGame', 'gameName' : gameName, 'gameRunner' : gameName});
     //sleep(Duration(milliseconds: 100));
     //если у текущего игрока есть карты того же достоинства то даем ему ими походить по желанию
+    /*
     if (games.last.playerCanAddCardsToMove()) {
       //answerTo([socketsTo[games.last.currentMovePlayer]], {});
       _msg.addAll({'typeMove' : 'youCanAddCards', 'dost' : games.last.dostOf(games.last.cards['heap'].first)});
+      answerTo([socketsTo[games.last.currentMovePlayer]], _msg);
     } else {
-      games.last.makeRuleOperation([games.last.cards['heap'].first]);
+      var toDo = games.last.makeRuleOperation([games.last.cards['heap'].first]);
+      if (toDo['updateCards']) {
+        String _whoGotNewCards = games.last.nextPlayer();
+          answerTo([clientsSockets[_whoGotNewCards]], {'type' : 'yourCards', 'cards' : json.encode(games.last.cards[_whoGotNewCards]), 'movePlayer' : playersOfGame[games.last.currentMovePlayer]});
+      } else {
+        answerTo(socketsTo, {'type' : 'inGame', 'typeMove' : 'nextMover', 'movePlayer' : playersOfGame[games.last.currentMovePlayer]});
+      };
     }
     answerTo(socketsTo, _msg);
+    */
   }
 }
 
@@ -232,7 +256,17 @@ void main(List<String> args) {
       server.listen(unoServer.handleSocketsStream);
       server.handleError((e){print;});
     }).catchError((Object error){print('error catched: $error');});
-  }, onError: (e, StackTrace stack){
-    print('ServerSocket error: $e');
+    /*
+    HttpServer httpServer = await HttpServer.bind(InternetAddress.anyIPv4, 8081);
+    await for (HttpRequest request in httpServer) {
+      request.response.write('hello');
+    }
+    */
   });
+  //HttpServer.bind(InternetAddress.anyIPv4, 8081).then((HttpServer server2) {
+  //  server2.listen((stream){stream.response.write('Hello!');});
+  //});
+  //}, onError: (e, StackTrace stack){
+  //  print('ServerSocket error: $e');
+  //});
 }

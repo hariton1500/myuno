@@ -94,7 +94,7 @@ class Uno {
 
   String nextPlayer() {
     int numberOfPlayers = humanPlayers.length;
-    if (currentMovePlayer == numberOfPlayers) {
+    if (currentMovePlayer + 1 == numberOfPlayers) {
       return humanPlayers[0];
     } else {
       return humanPlayers[currentMovePlayer + 1];
@@ -102,9 +102,10 @@ class Uno {
   }
 
   Map<String, dynamic> makeRuleOperation(List<String> moveCards) {
-    Map<String, dynamic> answer = {'updateCards' : false, 'countCards' : 0};//, 'setMast' : false};
+    Map<String, dynamic> answer = {'updateCards' : false, 'countCards' : 0, 'setMast' : false};
     switch (dostOf(moveCards.first)) {
       case '6': {
+        print('6: give 2 cards');
         razdachaToNextPlayer(2 * moveCards.length);
         answer['updateCards'] = true;
         answer['countCards'] = 2;
@@ -112,28 +113,29 @@ class Uno {
       }
       break;
       case '7': {
+        print('7: give 1 card');
         razdachaToNextPlayer(1 * moveCards.length);
         answer['updateCards'] = true;
         answer['countCards'] = 1;
-        setNextPlayer(2);
+        print(setNextPlayer(2));
       }
       break;
       case '8': {
+        print('8: give 1 card');
         razdachaToNextPlayer(1 * moveCards.length);
         answer['updateCards'] = true;
         answer['countCards'] = 1;
-        setNextPlayer(1);
+        print(setNextPlayer(1));
       }
       break;
-      case 'T':
-        setNextPlayer(1 + moveCards.length);
+      case 'Т':
+        print(setNextPlayer(1 + moveCards.length));
       break;
-      /*
-      case 'J': {
+      case 'В': {
         answer['setMast'] = true;
+        print(setNextPlayer(1));
       }
       break;
-      */
     }
     return answer;
   }
