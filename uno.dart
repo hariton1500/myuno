@@ -1,7 +1,6 @@
-import 'dart:math';
-
 class Uno {
   final List<String> humanPlayers, compPlayers = [];
+  //Map<String, bool> playerIsHuman = {};
   List<String> mastList = ['П', 'Т', 'Б', 'Ч'];
   List<String> dostList = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
   int currentMovePlayer, basePlayer = 0;
@@ -26,23 +25,34 @@ class Uno {
   }
 
   void rand(String owner) {
-    List<String> tempBase = [];
-    for (var i = 0; i < cards[owner].length; i++) {
-      int _index = Random().nextInt(cards[owner].length);
-      tempBase.add(cards[owner].elementAt(_index));
-      cards[owner].removeAt(_index);
+    print(cards[owner]);
+    cards[owner].shuffle();
+    /*
+    List<String> temp = [];
+    int _count = cards[owner].length;
+    for (var i = 0; i < _count; i++) {
+      String _card = cards[owner][Random().nextInt(cards[owner].length)];
+      temp.add(_card);
+      cards[owner].remove(_card);
     }
     cards[owner].clear();
-    cards[owner] = tempBase;
+    cards[owner] = temp;
+    */
+    print(cards[owner]);
   }
 
   void razdacha(int num) {
+    print('cards before:');
+    print(cards);
     for (var i = 0; i < num; i++) {
       humanPlayers.forEach((player) {
         cards[player].add(cards['base'].first);
         cards['base'].removeAt(0);
       });
+      //print('$humanPlayers[i] cards: $cards[$humanPlayers[i]]');
     }
+    print('cards after:');
+    print(cards);
   }
 
   initMove() {
@@ -74,22 +84,33 @@ class Uno {
     currentMovePlayer = index;
   }
 
-  setNextPlayer(int times) {
+  String setNextPlayer(int times) {
     for (var i = 0; i < times; i++) {
-      int numberOfPlayers = humanPlayers.length;
+      int numberOfPlayers = humanPlayers.length - 1;
       if (currentMovePlayer == numberOfPlayers) {
         currentMovePlayer = 0;
       } else {
         currentMovePlayer++;
       }
     }
+    return humanPlayers[currentMovePlayer];
   }
 
-  void razdachaToNextPlayer(int num) {
+  List<String> razdachaToCurrentPlayer(int num) {
+    String _player = humanPlayers[currentMovePlayer];
+    print('Razdacha $num cards to $_player');
+    List<String> _adding = [];
     for (var i = 0; i < num; i++) {
-      cards[nextPlayer()].add(cards['base'].first);
+      if (cards['base'].isEmpty) {
+        cards['base'] = cards['heap'];
+        cards['heap'] = [cards['heap'].last];
+        cards['base'].removeLast();
+      }
+      _adding.add(cards['base'].first);
       cards['base'].removeAt(0);
     }
+    cards[_player].addAll(_adding);
+    return _adding;
   }
 
   String nextPlayer() {
@@ -102,40 +123,53 @@ class Uno {
   }
 
   Map<String, dynamic> makeRuleOperation(List<String> moveCards) {
-    Map<String, dynamic> answer = {'updateCards' : false, 'countCards' : 0, 'setMast' : false};
+    print('Analizing what to do with move: $moveCards');
+    Map<String, dynamic> answer = {'updateCards' : false, 'countCards' : 0, 'setMast' : false, 'simpleCard' : false, 'moveTo' : false, 'adding' : <String>[], 'addingForWho' : ''};
     switch (dostOf(moveCards.first)) {
       case '6': {
         print('6: give 2 cards');
-        razdachaToNextPlayer(2 * moveCards.length);
+        answer['adding'] = razdachaToCurrentPlayer(2 * moveCards.length);
+        answer['addingForWho'] = humanPlayers[currentMovePlayer];
         answer['updateCards'] = true;
         answer['countCards'] = 2;
-        setNextPlayer(2);
+        print('Move tranfer to ${setNextPlayer(1)}');
+        answer['moveTo'] = true;
       }
       break;
       case '7': {
         print('7: give 1 card');
-        razdachaToNextPlayer(1 * moveCards.length);
+        answer['adding'] = razdachaToCurrentPlayer(moveCards.length);
+        answer['addingForWho'] = humanPlayers[currentMovePlayer];
         answer['updateCards'] = true;
         answer['countCards'] = 1;
-        print(setNextPlayer(2));
+        print('Move tranfer to ${setNextPlayer(1)}');
+        answer['moveTo'] = true;
       }
       break;
       case '8': {
         print('8: give 1 card');
-        razdachaToNextPlayer(1 * moveCards.length);
+        answer['adding'] = razdachaToCurrentPlayer(moveCards.length);
+        answer['addingForWho'] = humanPlayers[currentMovePlayer];
         answer['updateCards'] = true;
         answer['countCards'] = 1;
-        print(setNextPlayer(1));
+        print(setNextPlayer(0));
+        answer['moveTo'] = true;
       }
       break;
       case 'Т':
-        print(setNextPlayer(1 + moveCards.length));
+        //print('Т: next Player ${moveCards.length} times');
+        print('Move tranfer to ${setNextPlayer(1)}');
+        answer['moveTo'] = true;
       break;
       case 'В': {
+        print('new mast');
         answer['setMast'] = true;
-        print(setNextPlayer(1));
+        print(setNextPlayer(0));
       }
       break;
+      default:
+        answer['simpleCard'] = true;
+        print(setNextPlayer(0));
     }
     return answer;
   }
