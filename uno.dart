@@ -1,17 +1,21 @@
 class Uno {
   final List<String> humanPlayers, compPlayers = [];
   //Map<String, bool> playerIsHuman = {};
-  List<String> mastList = ['П', 'Т', 'Б', 'Ч'];
-  List<String> dostList = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
+  final List<String> mastList = ['П', 'Т', 'Б', 'Ч'];
+  final List<String> dostList = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
   int currentMovePlayer, basePlayer = 0;
   Map<String, List<String>> cards = {};
   final String name;
   String orderedMast = '';
+  Map<String, int> scores = {};
   
   Uno(this.name, this.humanPlayers) {
     cards['base'] = [];
     cards['heap'] = [];
-    humanPlayers.forEach((player) => cards[player] = []);
+    humanPlayers.forEach((player) {
+      cards[player] = [];
+      scores[player] = 0;
+    });
     mastList.forEach((mast) {
       dostList.forEach((dost) {
         cards['base'].add(dost + '-' + mast);
@@ -162,7 +166,7 @@ class Uno {
         answer['moveTo'] = true;
       break;
       case 'В': {
-        print('new mast');
+        print('mastLimit');
         answer['setMast'] = true;
         print(setNextPlayer(0));
       }
