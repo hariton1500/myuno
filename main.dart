@@ -494,8 +494,8 @@ void main(List<String> args) {
       server.handleError((e){print;});
     }).catchError((Object error){print('error catched: $error');});
     Timer.periodic(Duration(minutes: 60), unoServer.hourTimer);
-  });//, onError: (e, StackTrace stack){
-    //print('runtime error: $e');
-  //});
+  }, onError: (e, StackTrace stack){
+    print('runtime error: $e');
+  });
   
 }
