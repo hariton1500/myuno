@@ -26,7 +26,6 @@ class BridgeAI{
 
   List<String> myMoveIs() {
     List<String> _move = [], _moveVariants = [];
-    //TODO ...
     _moveVariants = checkForCardsToMove();
     _moveVariants.shuffle();
     if (_moveVariants.length >= 0) {

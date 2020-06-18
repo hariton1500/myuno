@@ -95,7 +95,6 @@ class GameServer {
   }
 
   hadleMsgInts(List<int> data) {
-    //print('msgInts: $data');
     String msg = utf8.decode(data, allowMalformed: true);
     if (msg.startsWith('{')) handleMsg(msg, currentSocket);
   }
@@ -165,8 +164,6 @@ class GameServer {
       case 'createGame':
         String _gameName = msg['name'];
         rooms.add(_gameName);
-        //scores[_gameName] = {};
-        //playersInGames[msg['name']] = msg['name'];
         print('Room ${rooms.last} created');
         answerTo([_gameName], {'type': 'roomCreated'});
         break;
@@ -246,13 +243,6 @@ class GameServer {
         answerTo(_toPlayers, {'type' : 'playersInGamesDowndate', 'playerName' : msg['who']});
         break;
       case 'runGame':
-        //TODO msg['players']
-        /*
-        List<String> _players = [];
-        json.decode(msg['players']).forEach((_player) {
-          _players.add(_player);
-        });
-        */
         startGame(msg['gameName']);
         break;
       case 'inGame':
@@ -301,7 +291,6 @@ class GameServer {
           print('$_to takes $_card from Base');
           answerTo([_to], {'type' : 'inGame', 'typeMove': 'addCards', 'cards' : json.encode([_card])});
           List<String> _coP = _game.humanPlayers;
-          //_coP.remove(_to);
           _coP.forEach((_name) {
             answerTo([_name], {'type' : 'inGame', 'typeMove': 'addCardsToCoPlayer', 'name' : _to, 'cardsNumber' : '1'});
           });
@@ -327,7 +316,6 @@ class GameServer {
             String _to = toDo['addingForWho'];
             answerTo([_to], {'type' : 'inGame', 'typeMove': 'addCards', 'cards' : json.encode(_cards)});
             List<String> _coP = _game.humanPlayers;
-            //_coP.remove(_to);
             _coP.forEach((_name) {
               answerTo([_name], {'type' : 'inGame', 'typeMove': 'addCardsToCoPlayer', 'name' : _to, 'cardsNumber' : _cardsNumber.toString()});
             });
@@ -371,7 +359,6 @@ class GameServer {
             'base' : json.encode(games[_index].cards['base'].length),
             'coPlayers' : json.encode(_coPlayers)
           });
-          //if (games[_index].playerCanAddCardsToMove()) _msg.addAll({'typeMove' : 'youCanAddCards', 'dost' : games.last.dostOf(games.last.cards['heap'].first)});
           print('Decided to send to ${[message['name']]} mess: $_msg');
           answerTo([message['name']], _msg);
         break;
@@ -407,7 +394,6 @@ class GameServer {
           _game.cards[_name].remove(_card);
           print('$_name made part of move by $_card');
           List<String> _coP = _game.humanPlayers;
-          //_coP.remove(_name);
           _coP.forEach((_player) {
             answerTo([_player], {'type' : 'inGame', 'typeMove': 'playerPlacedCard', 'name' : _name, 'card' : _card});
           });
@@ -428,7 +414,6 @@ class GameServer {
       print('score before: ${_game.scores}');
       print('count score for ${_game.humanPlayers}');
       _game.humanPlayers.forEach((_player){
-        //int _score = 0;
         _game.cards[_player].forEach((_card) {
           if (_game.dostOf(_card) == '10' ||
               _game.dostOf(_card) == 'К' ||
@@ -451,23 +436,14 @@ class GameServer {
     } else return false;
   }
 
-  void grepOfMove(Map<String, dynamic> move, int index) {
-    if (move['setMast']) {
-      //answerTo(to, msg);
-    }
-  }
-
   startGame(String gameName) {
     //ЗАПУСКАЕМ ИГРУ
-    //rooms.remove(gameName);
     //формируем списки игроков и сокетов участников игры
     List<String> playersOfGame = []; //список игроков этой игры
     List<Socket> socketsTo = []; //список сокетов игроков этой игры
     playersInGames.forEach((String name, String game){
       if (game == gameName) playersOfGame.add(name);
     });
-    //playersOfGame.forEach((_name) => _score[_name] = 0);
-    //_game.scores = _score;
     clientsSockets.forEach((String name, Socket socket){
       if (playersOfGame.contains(name)) socketsTo.add(socket);
     });
