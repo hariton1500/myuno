@@ -292,7 +292,7 @@ class GameServer {
           answerTo([_to], {'type' : 'inGame', 'typeMove': 'addCards', 'cards' : json.encode([_card])});
           List<String> _coP = _game.humanPlayers;
           _coP.forEach((_name) {
-            answerTo([_name], {'type' : 'inGame', 'typeMove': 'addCardsToCoPlayer', 'name' : _to, 'cardsNumber' : '1'});
+            answerTo([_name], {'type' : 'inGame', 'typeMove': 'addCardsToCoPlayer', 'name' : _to, 'cardsNumber' : '1', 'cards' : json.encode([_card])});
           });
           answerTo([_to], lastMsg);
           break;
@@ -317,7 +317,7 @@ class GameServer {
             answerTo([_to], {'type' : 'inGame', 'typeMove': 'addCards', 'cards' : json.encode(_cards)});
             List<String> _coP = _game.humanPlayers;
             _coP.forEach((_name) {
-              answerTo([_name], {'type' : 'inGame', 'typeMove': 'addCardsToCoPlayer', 'name' : _to, 'cardsNumber' : _cardsNumber.toString()});
+              answerTo([_name], {'type' : 'inGame', 'typeMove': 'addCardsToCoPlayer', 'name' : _to, 'cardsNumber' : _cardsNumber.toString(), 'cards' : json.encode(_cards)});
             });
             _checked = true;
             checkForAWinner(_game);
@@ -346,10 +346,10 @@ class GameServer {
         case 'getMyCardsAndInitMove':
           print('getCardsfrom ${message['name']}');
           Map<String, String> _msg = {'type' : 'inGame'};
-          Map<String, int> _coPlayers = {};
+          Map<String, List<String>> _coPlayers = {};
           games[_index].humanPlayers.forEach((name){
             if (message['name'].toString() != name) {
-              _coPlayers[name] = games[_index].cards[name].length;
+              _coPlayers[name] = games[_index].cards[name];
             }
           });
           _msg.addAll({
