@@ -41,7 +41,7 @@ class GameServer {
                 _coPlayersCards[_name] = _game.cards[_name].length;
               });
               AIAnswer aiMove = BridgeAI_2(_player, _game.name, _game.cards[_player], _coPlayersCards, _game.cards['heap'].last, msg).myFullMove;
-              botOperation(aiMove, _game, _player);
+              Timer(Duration(seconds: 1), () => botOperation(aiMove, _game, _player));
             }
           }
         }
@@ -49,8 +49,8 @@ class GameServer {
     });
   }
 
-  void botOperation(AIAnswer _aiMove, Uno _game, String _player) async{
-    sleep(Duration(seconds: 1));
+  void botOperation(AIAnswer _aiMove, Uno _game, String _player) {
+    //sleep(Duration(seconds: 1));
     print('We got move from AI:');
     if (_aiMove != null) {
       if (_aiMove.myMove != null) {
